@@ -330,8 +330,27 @@ function requireApi() {
 /**
  * The fields wp-admin's block editor needs back from `/wp/v2/<type>`. Without
  * them it cannot identify or load the record it just asked for.
+ *
+ * Checked against the type's own schema rather than demanded outright: a post
+ * type registered without `editor` support has no `content` field at all, and
+ * WordPress is right not to return one. team_member, property, testimonial and
+ * partner are all in that group — they carry their data in ACF fields — so
+ * requiring `content` of them reports a failure that is not there, and a check
+ * that cries wolf is one people stop reading.
  */
 const EDITOR_REQUIRED = ['id', 'title', 'content', 'status', 'type'];
+
+/** Field names a type's REST schema actually declares. */
+async function schemaFields(route) {
+  const res = await fetch(`${API}/wp-json/${route}`, {
+    method: 'OPTIONS',
+    headers: { Accept: 'application/json', Authorization: authHeader() },
+  });
+  if (!res.ok) return null;
+  const body = await res.json().catch(() => null);
+  const props = body?.schema?.properties;
+  return props ? Object.keys(props) : null;
+}
 
 /**
  * Checks that WordPress's own REST shape still reaches wp-admin.
@@ -384,7 +403,11 @@ async function checkAdminEditor() {
     }
 
     const item = res.payload[0];
-    const missing = EDITOR_REQUIRED.filter((f) => !(f in item));
+    const declared = await schemaFields(type.route);
+    const expected = declared
+      ? EDITOR_REQUIRED.filter((f) => declared.includes(f))
+      : EDITOR_REQUIRED;
+    const missing = expected.filter((f) => !(f in item));
     const idIsNumeric = typeof item.id === 'number';
 
     if (missing.length === 0 && idIsNumeric) {
