@@ -327,6 +327,91 @@ function requireApi() {
   process.exit(1);
 }
 
+/**
+ * The fields wp-admin's block editor needs back from `/wp/v2/<type>`. Without
+ * them it cannot identify or load the record it just asked for.
+ */
+const EDITOR_REQUIRED = ['id', 'title', 'content', 'status', 'type'];
+
+/**
+ * Checks that WordPress's own REST shape still reaches wp-admin.
+ *
+ * REDI Headless CMS rewrites `/wp/v2/<type>` into the shape this frontend
+ * wants: `id` becomes the slug, `title` a plain string, and the core fields
+ * the frontend ignores are dropped. That is fine for `context=view`, which is
+ * what the frontend asks for — but wp-admin asks the same routes for
+ * `context=edit`, and the block editor needs the core envelope back.
+ *
+ * When that rewrite was applied to both contexts, posts, team members,
+ * testimonials, partners and properties could not be created or edited in
+ * wp-admin at all. Opening one reported "You attempted to edit an item that
+ * doesn't exist"; creating one failed silently on the first autosave. Pages
+ * were unaffected and kept working, which is what made it look like a
+ * WordPress problem rather than a plugin one.
+ *
+ * This is the check that would have caught it. It needs credentials, because
+ * `context=edit` is capability-gated by WordPress — an anonymous request gets
+ * `rest_forbidden_context` and tells us nothing.
+ */
+async function checkAdminEditor() {
+  console.log("\n  wp-admin editor (context=edit must keep WordPress's own shape)");
+
+  if (!USER || !APP_PASSWORD) {
+    console.log(
+      '    SKIPPED  set WP_USER and WP_APP_PASSWORD to run this one. It is the only\n' +
+        '             check that can tell you whether the CMS is still editable.',
+    );
+    return;
+  }
+
+  const broken = [];
+  for (const type of TYPES) {
+    const res = await call(`${type.route}?context=edit&per_page=1`, { auth: true });
+
+    if (res.status === 401 || res.status === 403) {
+      console.log(
+        `    ${type.label.padEnd(14)} AUTH FAILED (HTTP ${res.status}) — credentials rejected`,
+      );
+      continue;
+    }
+    if (!res.ok || !Array.isArray(res.payload)) {
+      console.log(`    ${type.label.padEnd(14)} HTTP ${res.status} — could not read`);
+      continue;
+    }
+    if (res.payload.length === 0) {
+      console.log(`    ${type.label.padEnd(14)} no items yet — nothing to verify`);
+      continue;
+    }
+
+    const item = res.payload[0];
+    const missing = EDITOR_REQUIRED.filter((f) => !(f in item));
+    const idIsNumeric = typeof item.id === 'number';
+
+    if (missing.length === 0 && idIsNumeric) {
+      console.log(`    ${type.label.padEnd(14)} OK`);
+    } else {
+      const why = [
+        !idIsNumeric ? `id is ${typeof item.id}, not a number` : null,
+        missing.length ? `missing ${missing.join(', ')}` : null,
+      ]
+        .filter(Boolean)
+        .join('; ');
+      console.log(`    ${type.label.padEnd(14)} BROKEN — ${why}`);
+      broken.push(type.label);
+    }
+  }
+
+  if (broken.length) {
+    console.log(
+      `\n    BROKEN: ${broken.join(', ')} cannot be created or edited in wp-admin.\n` +
+        `    Cause: a rest_prepare_* filter is rewriting the response for every context\n` +
+        `    instead of only for the frontend's context=view. Fix it at the source by\n` +
+        `    returning early when context is "edit", or install the REDI Admin Editor Fix\n` +
+        `    plugin, which restores the core fields for edit requests only.`,
+    );
+  }
+}
+
 async function check() {
   requireApi();
   console.log(`\nWordPress readiness: ${API}\n`);
@@ -396,6 +481,8 @@ async function check() {
         `  group > Settings > Show in REST API > Yes.`,
     );
   }
+  await checkAdminEditor();
+
   console.log(
     `\n  Anything marked MISSING is WordPress-side work — see docs/WORDPRESS_INTEGRATION.md §6.\n`,
   );
