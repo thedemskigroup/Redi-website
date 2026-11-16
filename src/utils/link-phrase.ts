@@ -57,9 +57,13 @@ export function linkPhrase(
   const escapedPhrase = escapeHtml(phrase);
   if (!escapedText.includes(escapedPhrase)) return escapedText;
 
+  // cyan-600 is the house link colour on a light background (see the `link`
+  // button variant). NOT cyan-700: this project defines its own cyan ramp and
+  // it stops at 600, so `text-cyan-700` fell through to Tailwind's stock cyan -
+  // a different hue from the brand, and nothing in the palette.
   const anchor =
     `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"` +
-    ` class="text-cyan-700 underline underline-offset-4 transition-colors hover:text-cyan-600">` +
+    ` class="text-cyan-600 underline underline-offset-4 transition-colors hover:text-cyan-550">` +
     `${escapedPhrase}</a>`;
 
   const pattern = new RegExp(escapeRegExp(escapedPhrase), options.all ? 'g' : '');
