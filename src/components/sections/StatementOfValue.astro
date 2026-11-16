@@ -2,6 +2,7 @@
 import type { PageCopy } from '@/services/wordpress';
 import SectionHeading from '@/components/ui/SectionHeading.astro';
 import Icon from '@/components/ui/Icon.astro';
+import { linkPhraseOnce } from '@/utils/link-phrase';
 
 export interface Props {
   copy: PageCopy['home']['statementOfValue'];
@@ -9,6 +10,20 @@ export interface Props {
 }
 
 const { copy, compare } = Astro.props;
+
+/*
+  The client asked for "Site Selectors Guild" to link to the Guild here
+  (2026-11-16). Applied at render time rather than written into the copy,
+  because these paragraphs are editable in wp-admin - a link baked into the
+  seed would vanish the first time someone retyped the sentence. See
+  src/utils/link-phrase.ts; the text is escaped before the anchor goes in.
+*/
+const GUILD_URL = 'https://siteselectorsguild.com';
+const GUILD_PHRASE = 'Site Selectors Guild';
+
+/* Linked once per section: the copy names the Guild in two paragraphs and the
+   same link twice adds nothing. */
+const paragraphsHtml = linkPhraseOnce(copy.paragraphs, GUILD_PHRASE, GUILD_URL);
 ---
 
 <section class="bg-steel-100 py-14 sm:py-20 md:py-24">
@@ -17,7 +32,7 @@ const { copy, compare } = Astro.props;
 
     <div class="reveal mt-10 grid items-center gap-12 lg:grid-cols-[1fr_1.3fr] lg:gap-10">
       <div class="text-ink-600 space-y-6 text-[15px] leading-relaxed sm:text-base">
-        {copy.paragraphs.map((p) => <p>{p}</p>)}
+        {paragraphsHtml.map((html) => <p set:html={html} />)}
       </div>
 
       <div

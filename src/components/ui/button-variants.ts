@@ -15,6 +15,13 @@ export const buttonVariants = cva(
         dark: 'bg-navy-950 text-white shadow-soft hover:-translate-y-0.5 hover:bg-navy-900 hover:shadow-card active:translate-y-0',
         outline:
           'border-2 border-cyan-400/70 bg-black/10 text-cyan-400 backdrop-blur-lg hover:-translate-y-0.5 hover:border-cyan-400 hover:bg-black/20 active:translate-y-0',
+        // As `outline`, but on a solid navy fill instead of a translucent one.
+        // The client asked for this button's background to be dark blue too
+        // (2026-11-16), after the primary CTA beside it went navy. It keeps the
+        // cyan border and label so the pair still reads as primary + secondary
+        // rather than two identical buttons.
+        'outline-filled':
+          'border-2 border-cyan-400/70 bg-navy-950 text-cyan-400 shadow-soft hover:-translate-y-0.5 hover:border-cyan-400 hover:bg-navy-900 hover:shadow-card active:translate-y-0',
         'outline-dark':
           'border-2 border-navy-950/20 bg-transparent text-navy-950 hover:-translate-y-0.5 hover:border-navy-950/40 hover:bg-navy-950/5 active:translate-y-0',
         ghost: 'bg-transparent text-navy-950 hover:bg-navy-950/5',
